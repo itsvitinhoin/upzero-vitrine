@@ -18,6 +18,7 @@ interface CatalogProductCardProps {
   colorLabel?: string
   price?: number
   sizes?: string[]
+  unavailableSizes?: string[]
   demand?: DemandLevel
 }
 
@@ -29,6 +30,7 @@ export function CatalogProductCard({
   colorLabel,
   price = 89.90,
   sizes = ["P", "M", "G", "GG"],
+  unavailableSizes = [],
   demand,
 }: CatalogProductCardProps) {
   const { isAuthenticated } = useAuth()
@@ -111,11 +113,22 @@ export function CatalogProductCard({
           </p>
           <div className="flex items-center gap-1 flex-wrap">
             <span className="text-[10px] text-gray-500">Tam:</span>
-            {sizes.map((size) => (
-              <span key={size} className="text-[10px] text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">
-                {size}
-              </span>
-            ))}
+            {sizes.map((size) => {
+              const unavailable = unavailableSizes.includes(size)
+              return (
+                <span
+                  key={size}
+                  className={`text-[10px] px-1.5 py-0.5 rounded ${
+                    unavailable
+                      ? "text-gray-400 bg-gray-50 line-through"
+                      : "text-gray-600 bg-gray-100"
+                  }`}
+                  title={unavailable ? "Esgotado" : undefined}
+                >
+                  {size}
+                </span>
+              )
+            })}
           </div>
         </div>
       ) : (
