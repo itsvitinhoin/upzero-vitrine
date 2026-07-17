@@ -85,13 +85,26 @@ export function ProductDetail({ productId }: ProductDetailProps) {
 
   // Cor selecionada que controla as fotos exibidas na galeria
   const [selectedColor, setSelectedColor] = useState(productData.colors[0].name)
+  const galleryRef = useRef<HTMLDivElement>(null)
 
   const selectColor = (colorName: string) => {
     setSelectedColor(colorName)
     setCurrentPair(0)
+    // Sobe a tela para as fotos da cor selecionada
+    galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   const activeColor = productData.colors.find(c => c.name === selectedColor) ?? productData.colors[0]
+
+  // Disponibilidade agregada para riscar cores/tamanhos esgotados
+  const isSizeAvailable = (size: string) =>
+    productData.colors.some(c => c.available[size as keyof typeof c.available])
+  const isColorAvailable = (color: (typeof productData.colors)[number]) =>
+    productData.sizes.some(size => color.available[size as keyof typeof color.available])
+
+  // Gradiente placeholder que reflete a cor ativa (varia por índice p/ simular fotos distintas)
+  const imageGradient = (index: number) =>
+    `linear-gradient(${135 + index * 35}deg, ${activeColor.color}33, ${activeColor.color}aa)`
 
   const totalImages = productData.images.length
   const pixPrice = productData.price * (1 - productData.pixDiscount)
@@ -181,60 +194,92 @@ export function ProductDetail({ productId }: ProductDetailProps) {
     <div className="w-full">
       <div className="flex flex-col lg:flex-row">
         {/* Left - Image Gallery */}
-        <div className="relative lg:w-[60%] flex">
-          <button
-            onClick={prevPair}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
-          >
-            <ChevronLeft size={28} className="text-gray-700" />
-          </button>
-
-          <div className="w-full aspect-[3/4] bg-gray-100 relative overflow-hidden">
-            <div
-              className="absolute inset-0"
-              style={{
-                background: `linear-gradient(135deg, ${activeColor.color}33, ${activeColor.color}99)`,
-              }}
-            />
-          </div>
-
-          {/* Cor ativa */}
-          <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full">
-            <span
-              className="w-4 h-4 rounded-full border border-gray-300"
-              style={{ backgroundColor: activeColor.color }}
-            />
-            <span className="text-xs font-medium text-gray-800">{activeColor.name}</span>
-          </div>
-
-          {/* Indicadores de posição */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
+        <div ref={galleryRef} className="lg:w-[60%] flex flex-col md:flex-row gap-2 md:gap-3 p-2 md:p-3 scroll-mt-20">
+          {/* Thumbnails - vertical (desktop) */}
+          <div className="hidden md:flex flex-col gap-2 w-16 lg:w-20 shrink-0 max-h-[80vh] overflow-y-auto py-0.5">
             {productData.images.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentPair(index)}
                 aria-label={`Ver foto ${index + 1}`}
-                className={`h-1.5 rounded-full transition-all ${
-                  index === currentPair ? "w-6 bg-gray-800" : "w-1.5 bg-white/70 hover:bg-white"
+                className={`relative w-full aspect-[2/3] rounded-md overflow-hidden border-2 transition-colors ${
+                  currentPair === index ? "border-gray-800" : "border-transparent hover:border-gray-400"
                 }`}
-              />
+              >
+                <span className="absolute inset-0" style={{ background: imageGradient(index) }} />
+              </button>
             ))}
           </div>
 
-          <button
-            onClick={nextPair}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
-          >
-            <ChevronRight size={28} className="text-gray-700" />
-          </button>
+          {/* Main image */}
+          <div className="relative flex-1">
+            <div className="w-full aspect-[2/3] bg-gray-100 relative overflow-hidden rounded-md">
+              <div className="absolute inset-0" style={{ background: imageGradient(currentPair) }} />
+            </div>
 
-          <div className="absolute top-4 right-4 flex gap-3 z-10">
-            <button className="p-2 hover:opacity-70 text-gray-500">
-              <Share2 size={20} />
+            <button
+              onClick={prevPair}
+              aria-label="Foto anterior"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
+            >
+              <ChevronLeft size={26} className="text-gray-700" />
             </button>
-            <button className="p-2 hover:opacity-70 text-gray-500">
-              <Heart size={20} />
+
+            <button
+              onClick={nextPair}
+              aria-label="Próxima foto"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
+            >
+              <ChevronRight size={26} className="text-gray-700" />
             </button>
+
+            {/* Cor ativa */}
+            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full">
+              <span
+                className="w-4 h-4 rounded-full border border-gray-300"
+                style={{ backgroundColor: activeColor.color }}
+              />
+              <span className="text-xs font-medium text-gray-800">{activeColor.name}</span>
+            </div>
+
+            {/* Indicadores de posição */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
+              {productData.images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPair(index)}
+                  aria-label={`Ver foto ${index + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === currentPair ? "w-6 bg-gray-800" : "w-1.5 bg-white/70 hover:bg-white"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="absolute top-4 right-4 flex gap-3 z-10">
+              <button aria-label="Compartilhar" className="p-2 hover:opacity-70 text-gray-500">
+                <Share2 size={20} />
+              </button>
+              <button aria-label="Favoritar" className="p-2 hover:opacity-70 text-gray-500">
+                <Heart size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Thumbnails - horizontal (mobile) */}
+          <div className="flex md:hidden gap-2 overflow-x-auto pb-1">
+            {productData.images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPair(index)}
+                aria-label={`Ver foto ${index + 1}`}
+                className={`relative shrink-0 w-14 aspect-[2/3] rounded-md overflow-hidden border-2 transition-colors ${
+                  currentPair === index ? "border-gray-800" : "border-transparent hover:border-gray-400"
+                }`}
+              >
+                <span className="absolute inset-0" style={{ background: imageGradient(index) }} />
+              </button>
+            ))}
           </div>
         </div>
 
@@ -392,21 +437,26 @@ export function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           )}
 
-          {/* Pedido Rápido - Only for logged in users */}
-          {isAuthenticated && (
-            <div className="mb-6 border border-gray-200 rounded-lg p-4">
+          {/* Pedido Rápido (logado) / Cores e Tamanhos (visitante) */}
+          <div className="mb-6 border border-gray-200 rounded-lg p-4">
               {/* Header */}
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 tracking-wide">PEDIDO RÁPIDO</h3>
+                  <h3 className="text-sm font-bold text-gray-900 tracking-wide">
+                    {isAuthenticated ? "PEDIDO RÁPIDO" : "CORES E TAMANHOS"}
+                  </h3>
                   <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-0.5">
-                    Cada ajuste atualiza o carrinho automaticamente.
+                    {isAuthenticated
+                      ? "Cada ajuste atualiza o carrinho automaticamente."
+                      : "Selecione a cor para ver as fotos."}
                   </p>
                 </div>
-                <div className="flex items-center gap-1.5 text-gray-700 flex-shrink-0">
-                  <ShoppingCart size={16} />
-                  <span className="text-xs font-medium whitespace-nowrap">{totalItems} PC.</span>
-                </div>
+                {isAuthenticated && (
+                  <div className="flex items-center gap-1.5 text-gray-700 flex-shrink-0">
+                    <ShoppingCart size={16} />
+                    <span className="text-xs font-medium whitespace-nowrap">{totalItems} PC.</span>
+                  </div>
+                )}
               </div>
 
               {/* Scroll hint */}
@@ -424,18 +474,25 @@ export function ProductDetail({ productId }: ProductDetailProps) {
                   <thead>
                     <tr>
                       <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 w-[76px]" />
-                      {productData.sizes.map(size => (
-                        <th
-                          key={size}
-                          className="bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-sm font-normal text-gray-700 py-3"
-                        >
-                          {size.split(" ")[0]}
-                        </th>
-                      ))}
+                      {productData.sizes.map(size => {
+                        const available = isSizeAvailable(size)
+                        return (
+                          <th
+                            key={size}
+                            className={`bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-sm font-normal py-3 ${
+                              available ? "text-gray-700" : "text-gray-400 line-through"
+                            }`}
+                          >
+                            {size.split(" ")[0]}
+                          </th>
+                        )
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {productData.colors.map((color) => (
+                    {productData.colors.map((color) => {
+                      const colorAvailable = isColorAvailable(color)
+                      return (
                       <tr key={color.name}>
                         <td className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-3 align-middle w-[76px]">
                           <button
@@ -445,15 +502,24 @@ export function ProductDetail({ productId }: ProductDetailProps) {
                             aria-label={`Ver fotos da cor ${color.name}`}
                             aria-pressed={selectedColor === color.name}
                           >
+                            <span className="relative w-10 h-10">
+                              <span
+                                className={`block w-10 h-10 rounded-full border transition-all ${
+                                  selectedColor === color.name
+                                    ? "border-gray-800 ring-2 ring-gray-800 ring-offset-1"
+                                    : "border-gray-300 group-hover:border-gray-500"
+                                } ${colorAvailable ? "" : "opacity-40"}`}
+                                style={{ backgroundColor: color.color }}
+                              />
+                              {!colorAvailable && (
+                                <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-600 rounded-full" />
+                              )}
+                            </span>
                             <span
-                              className={`w-10 h-10 rounded-full border transition-all ${
-                                selectedColor === color.name
-                                  ? "border-gray-800 ring-2 ring-gray-800 ring-offset-1"
-                                  : "border-gray-300 group-hover:border-gray-500"
+                              className={`block text-[10px] leading-tight text-center px-0.5 ${
+                                colorAvailable ? "text-gray-600" : "text-gray-400 line-through"
                               }`}
-                              style={{ backgroundColor: color.color }}
-                            />
-                            <span className="block text-[10px] text-gray-600 leading-tight text-center px-0.5">
+                            >
                               {color.name}
                             </span>
                           </button>
@@ -468,63 +534,81 @@ export function ProductDetail({ productId }: ProductDetailProps) {
                               className="border-b border-r border-gray-200 last:border-r-0 text-center py-2"
                             >
                               {isAvailable ? (
-                                <div className="flex flex-col items-center">
-                                  <button
-                                    onClick={() => updateQuantity(color.name, size, 1)}
-                                    className="text-gray-400 hover:text-gray-900 transition-colors"
-                                    aria-label={`Adicionar ${color.name} tamanho ${size}`}
-                                  >
-                                    <Plus size={14} />
-                                  </button>
+                                isAuthenticated ? (
+                                  <div className="flex flex-col items-center">
+                                    <button
+                                      onClick={() => updateQuantity(color.name, size, 1)}
+                                      className="text-gray-400 hover:text-gray-900 transition-colors"
+                                      aria-label={`Adicionar ${color.name} tamanho ${size}`}
+                                    >
+                                      <Plus size={14} />
+                                    </button>
+                                    <span
+                                      className={`text-base leading-tight ${
+                                        qty > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700"
+                                      }`}
+                                    >
+                                      {qty}
+                                    </span>
+                                    <button
+                                      onClick={() => updateQuantity(color.name, size, -1)}
+                                      className="text-gray-400 hover:text-gray-900 transition-colors disabled:opacity-30 disabled:hover:text-gray-400"
+                                      disabled={qty === 0}
+                                      aria-label={`Remover ${color.name} tamanho ${size}`}
+                                    >
+                                      <Minus size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
                                   <span
-                                    className={`text-base leading-tight ${
-                                      qty > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700"
-                                    }`}
-                                  >
-                                    {qty}
-                                  </span>
-                                  <button
-                                    onClick={() => updateQuantity(color.name, size, -1)}
-                                    className="text-gray-400 hover:text-gray-900 transition-colors disabled:opacity-30 disabled:hover:text-gray-400"
-                                    disabled={qty === 0}
-                                    aria-label={`Remover ${color.name} tamanho ${size}`}
-                                  >
-                                    <Minus size={14} />
-                                  </button>
-                                </div>
+                                    className="inline-block w-2.5 h-2.5 rounded-full bg-gray-800"
+                                    aria-label="Disponível"
+                                    title="Disponível"
+                                  />
+                                )
                               ) : (
-                                <span
-                                  className="inline-block w-4 h-4 rounded-full bg-gray-300"
-                                  aria-label="Esgotado"
-                                  title="Esgotado"
-                                />
+                                <span className="relative inline-block w-4 h-4" aria-label="Esgotado" title="Esgotado">
+                                  <span className="block w-4 h-4 rounded-full bg-gray-200" />
+                                  <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-400 rounded-full" />
+                                </span>
                               )}
                             </td>
                           )
                         })}
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              {/* Totals */}
-              <div className="flex items-center justify-between mt-4">
-                <span className="text-sm text-gray-600">{totalItems} PC.</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  R$ {subtotal.toFixed(2).replace(".", ",")}
-                </span>
-              </div>
+              {isAuthenticated ? (
+                <>
+                  {/* Totals */}
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-sm text-gray-600">{totalItems} PC.</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      R$ {subtotal.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
 
-              {/* Continue shopping */}
-              <Link
-                href="/catalogo"
-                className="mt-3 w-full flex items-center justify-center border border-gray-800 rounded-md py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
-              >
-                Continuar Comprando
-              </Link>
+                  {/* Continue shopping */}
+                  <Link
+                    href="/catalogo"
+                    className="mt-3 w-full flex items-center justify-center border border-gray-800 rounded-md py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                  >
+                    Continuar Comprando
+                  </Link>
+                </>
+              ) : (
+                <p className="mt-4 text-center text-xs text-gray-500">
+                  <Link href="/login" className="text-gray-900 font-medium underline">
+                    Cadastre-se
+                  </Link>{" "}
+                  para ver preços e comprar no atacado.
+                </p>
+              )}
             </div>
-          )}
 
           {/* Shipping Calculator - Only for logged in users */}
           {isAuthenticated && (
