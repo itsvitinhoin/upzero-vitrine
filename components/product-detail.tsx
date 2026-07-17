@@ -93,18 +93,13 @@ export function ProductDetail({ productId }: ProductDetailProps) {
 
   const activeColor = productData.colors.find(c => c.name === selectedColor) ?? productData.colors[0]
 
-  const totalPairs = Math.ceil(productData.images.length / 2)
+  const totalImages = productData.images.length
   const pixPrice = productData.price * (1 - productData.pixDiscount)
   const installmentValue = productData.price / productData.installments
 
-  const nextPair = () => setCurrentPair((prev) => (prev + 1) % totalPairs)
-  const prevPair = () => setCurrentPair((prev) => (prev - 1 + totalPairs) % totalPairs)
+  const nextPair = () => setCurrentPair((prev) => (prev + 1) % totalImages)
+  const prevPair = () => setCurrentPair((prev) => (prev - 1 + totalImages) % totalImages)
   const toggleSection = (section: string) => setExpandedSection(expandedSection === section ? null : section)
-
-  const currentImages = [
-    productData.images[currentPair * 2],
-    productData.images[currentPair * 2 + 1],
-  ].filter(Boolean)
 
   const updateQuantity = (colorName: string, size: string, delta: number) => {
     const key = `${colorName}-${size}`
@@ -194,20 +189,13 @@ export function ProductDetail({ productId }: ProductDetailProps) {
             <ChevronLeft size={28} className="text-gray-700" />
           </button>
 
-          <div className="flex w-full">
-            {currentImages.map((_, index) => (
-              <div key={index} className="w-1/2 aspect-[3/4] bg-gray-100 relative">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: `linear-gradient(135deg, ${activeColor.color}33, ${activeColor.color}99)`,
-                  }}
-                />
-              </div>
-            ))}
-            {currentImages.length === 1 && (
-              <div className="w-1/2 aspect-[3/4] bg-gray-50" />
-            )}
+          <div className="w-full aspect-[3/4] bg-gray-100 relative overflow-hidden">
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `linear-gradient(135deg, ${activeColor.color}33, ${activeColor.color}99)`,
+              }}
+            />
           </div>
 
           {/* Cor ativa */}
@@ -217,6 +205,20 @@ export function ProductDetail({ productId }: ProductDetailProps) {
               style={{ backgroundColor: activeColor.color }}
             />
             <span className="text-xs font-medium text-gray-800">{activeColor.name}</span>
+          </div>
+
+          {/* Indicadores de posição */}
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
+            {productData.images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPair(index)}
+                aria-label={`Ver foto ${index + 1}`}
+                className={`h-1.5 rounded-full transition-all ${
+                  index === currentPair ? "w-6 bg-gray-800" : "w-1.5 bg-white/70 hover:bg-white"
+                }`}
+              />
+            ))}
           </div>
 
           <button
