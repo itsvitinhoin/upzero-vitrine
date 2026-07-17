@@ -83,6 +83,16 @@ export function ProductDetail({ productId }: ProductDetailProps) {
   // Grade de quantidades: { "colorName-size": quantity }
   const [quantities, setQuantities] = useState<Record<string, number>>({})
 
+  // Cor selecionada que controla as fotos exibidas na galeria
+  const [selectedColor, setSelectedColor] = useState(productData.colors[0].name)
+
+  const selectColor = (colorName: string) => {
+    setSelectedColor(colorName)
+    setCurrentPair(0)
+  }
+
+  const activeColor = productData.colors.find(c => c.name === selectedColor) ?? productData.colors[0]
+
   const totalPairs = Math.ceil(productData.images.length / 2)
   const pixPrice = productData.price * (1 - productData.pixDiscount)
   const installmentValue = productData.price / productData.installments
@@ -187,12 +197,26 @@ export function ProductDetail({ productId }: ProductDetailProps) {
           <div className="flex w-full">
             {currentImages.map((_, index) => (
               <div key={index} className="w-1/2 aspect-[3/4] bg-gray-100 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300" />
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${activeColor.color}33, ${activeColor.color}99)`,
+                  }}
+                />
               </div>
             ))}
             {currentImages.length === 1 && (
               <div className="w-1/2 aspect-[3/4] bg-gray-50" />
             )}
+          </div>
+
+          {/* Cor ativa */}
+          <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full">
+            <span
+              className="w-4 h-4 rounded-full border border-gray-300"
+              style={{ backgroundColor: activeColor.color }}
+            />
+            <span className="text-xs font-medium text-gray-800">{activeColor.name}</span>
           </div>
 
           <button
@@ -394,16 +418,16 @@ export function ProductDetail({ productId }: ProductDetailProps) {
 
               {/* Grid */}
               <div className="overflow-x-auto border border-gray-200 rounded-md">
-                <table className="w-full min-w-[440px] border-collapse [&_tbody_tr:last-child_td]:border-b-0">
+                <table className="w-full min-w-[360px] border-collapse [&_tbody_tr:last-child_td]:border-b-0">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 w-28" />
+                      <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 w-[76px]" />
                       {productData.sizes.map(size => (
                         <th
                           key={size}
-                          className="bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-xs font-medium text-gray-700 py-2.5"
+                          className="bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-sm font-normal text-gray-700 py-3"
                         >
-                          {size}
+                          {size.split(" ")[0]}
                         </th>
                       ))}
                     </tr>
@@ -411,14 +435,26 @@ export function ProductDetail({ productId }: ProductDetailProps) {
                   <tbody>
                     {productData.colors.map((color) => (
                       <tr key={color.name}>
-                        <td className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-3 py-3 align-middle">
-                          <span
-                            className="block w-6 h-6 rounded-full border border-gray-200 mb-1.5"
-                            style={{ backgroundColor: color.color }}
-                          />
-                          <span className="block text-[11px] text-gray-700 leading-tight truncate max-w-[72px]">
-                            {color.name}
-                          </span>
+                        <td className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-3 align-middle w-[76px]">
+                          <button
+                            type="button"
+                            onClick={() => selectColor(color.name)}
+                            className="flex flex-col items-center gap-1.5 w-full group"
+                            aria-label={`Ver fotos da cor ${color.name}`}
+                            aria-pressed={selectedColor === color.name}
+                          >
+                            <span
+                              className={`w-10 h-10 rounded-full border transition-all ${
+                                selectedColor === color.name
+                                  ? "border-gray-800 ring-2 ring-gray-800 ring-offset-1"
+                                  : "border-gray-300 group-hover:border-gray-500"
+                              }`}
+                              style={{ backgroundColor: color.color }}
+                            />
+                            <span className="block text-[10px] text-gray-600 leading-tight text-center px-0.5">
+                              {color.name}
+                            </span>
+                          </button>
                         </td>
                         {productData.sizes.map(size => {
                           const isAvailable = color.available[size as keyof typeof color.available]
