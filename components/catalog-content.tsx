@@ -29,6 +29,7 @@ const products = [
     tag: "NEW IN",
     colorLabel: "ONÇA",
     demand: "hot" as const,
+    unavailableSizes: ["GG"],
   },
   {
     id: "2",
@@ -41,6 +42,7 @@ const products = [
     tag: "NEW IN",
     colorLabel: "ONÇA",
     demand: "rising" as const,
+    unavailableSizes: ["P", "M"],
   },
   {
     id: "3",
@@ -73,6 +75,7 @@ const products = [
       { name: "Marrom", color: "#5D4037" },
     ],
     tag: "NEW IN",
+    unavailableSizes: ["G"],
   },
   {
     id: "6",
@@ -223,6 +226,7 @@ export function CatalogContent() {
             tag={product.tag}
             colorLabel={product.colorLabel}
             demand={product.demand}
+            unavailableSizes={product.unavailableSizes}
           />
         ))}
       </div>

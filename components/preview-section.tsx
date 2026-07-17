@@ -13,6 +13,7 @@ const products = [
     ],
     tag: "ONÇA",
     demand: "hot" as const,
+    unavailableSizes: ["GG"],
   },
   {
     name: "CALÇA PALA FRANZIDO TULE SOFT STRETCH ONÇA",
@@ -20,6 +21,7 @@ const products = [
       { name: "Onça", color: "#8B7355" },
     ],
     tag: "ONÇA",
+    unavailableSizes: ["P", "M"],
   },
   {
     name: "BLAZER ALFAIATARIA KOBE",
@@ -84,6 +86,7 @@ export function PreviewSection() {
               colors={product.colors}
               tag={product.tag}
               demand={product.demand}
+              unavailableSizes={product.unavailableSizes}
             />
           ))}
         </div>

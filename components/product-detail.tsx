@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Share2, Heart, Ruler, X, Minus, Plus, Truck, ShoppingBag, Store, TrendingUp, Eye, MousePointerClick, Users, Award } from "lucide-react"
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Share2, Heart, Ruler, X, Minus, Plus, Truck, ShoppingCart, ArrowRight, Store, TrendingUp, Eye, MousePointerClick, Users, Award } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { useCart } from "@/contexts/cart-context"
 
@@ -72,7 +72,7 @@ const productData = {
 
 export function ProductDetail({ productId }: ProductDetailProps) {
   const { isAuthenticated } = useAuth()
-  const { addItem } = useCart()
+  const { setProductGrid, getItemsByProduct } = useCart()
   const [currentPair, setCurrentPair] = useState(0)
   const [expandedSection, setExpandedSection] = useState<string | null>("details")
   const [showMeasurements, setShowMeasurements] = useState(false)
@@ -83,18 +83,36 @@ export function ProductDetail({ productId }: ProductDetailProps) {
   // Grade de quantidades: { "colorName-size": quantity }
   const [quantities, setQuantities] = useState<Record<string, number>>({})
 
-  const totalPairs = Math.ceil(productData.images.length / 2)
+  // Cor selecionada que controla as fotos exibidas na galeria
+  const [selectedColor, setSelectedColor] = useState(productData.colors[0].name)
+  const galleryRef = useRef<HTMLDivElement>(null)
+
+  const selectColor = (colorName: string) => {
+    setSelectedColor(colorName)
+    setCurrentPair(0)
+    // Sobe a tela para as fotos da cor selecionada
+    galleryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const activeColor = productData.colors.find(c => c.name === selectedColor) ?? productData.colors[0]
+
+  // Disponibilidade agregada para riscar cores/tamanhos esgotados
+  const isSizeAvailable = (size: string) =>
+    productData.colors.some(c => c.available[size as keyof typeof c.available])
+  const isColorAvailable = (color: (typeof productData.colors)[number]) =>
+    productData.sizes.some(size => color.available[size as keyof typeof color.available])
+
+  // Gradiente placeholder que reflete a cor ativa (varia por índice p/ simular fotos distintas)
+  const imageGradient = (index: number) =>
+    `linear-gradient(${135 + index * 35}deg, ${activeColor.color}33, ${activeColor.color}aa)`
+
+  const totalImages = productData.images.length
   const pixPrice = productData.price * (1 - productData.pixDiscount)
   const installmentValue = productData.price / productData.installments
 
-  const nextPair = () => setCurrentPair((prev) => (prev + 1) % totalPairs)
-  const prevPair = () => setCurrentPair((prev) => (prev - 1 + totalPairs) % totalPairs)
+  const nextPair = () => setCurrentPair((prev) => (prev + 1) % totalImages)
+  const prevPair = () => setCurrentPair((prev) => (prev - 1 + totalImages) % totalImages)
   const toggleSection = (section: string) => setExpandedSection(expandedSection === section ? null : section)
-
-  const currentImages = [
-    productData.images[currentPair * 2],
-    productData.images[currentPair * 2 + 1],
-  ].filter(Boolean)
 
   const updateQuantity = (colorName: string, size: string, delta: number) => {
     const key = `${colorName}-${size}`
@@ -118,35 +136,50 @@ export function ProductDetail({ productId }: ProductDetailProps) {
     }
   }
 
-  const handleAddToCart = () => {
-    if (totalItems === 0) return
-
-    const colorsWithQuantities = productData.colors
-      .map(color => ({
-        name: color.name,
-        hex: color.color,
-        sizes: productData.sizes
-          .map(size => ({
-            size,
-            quantity: getQuantity(color.name, size),
-            available: color.available[size as keyof typeof color.available]
-          }))
-          .filter(s => s.quantity > 0)
-      }))
-      .filter(c => c.sizes.length > 0)
-
-    if (colorsWithQuantities.length > 0) {
-      addItem({
-        id: productId,
-        name: productData.name,
-        price: productData.price,
-        colors: colorsWithQuantities
+  // Inicializa a grade local a partir do que já existe no carrinho para este produto
+  useEffect(() => {
+    const existing = getItemsByProduct(productId)
+    if (existing) {
+      const initial: Record<string, number> = {}
+      existing.colors.forEach(color => {
+        color.sizes.forEach(s => {
+          initial[`${color.name}-${s.size}`] = s.quantity
+        })
       })
-      
-      // Reset quantities after adding
-      setQuantities({})
+      setQuantities(initial)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId])
+
+  // Sincroniza automaticamente cada ajuste da grade com o carrinho
+  const didInitSync = useRef(false)
+  useEffect(() => {
+    // Evita gravar no carrinho antes da inicialização a partir dele
+    if (!didInitSync.current) {
+      didInitSync.current = true
+      return
+    }
+
+    const colorsWithQuantities = productData.colors.map(color => ({
+      name: color.name,
+      hex: color.color,
+      sizes: productData.sizes
+        .map(size => ({
+          size,
+          quantity: getQuantity(color.name, size),
+          available: color.available[size as keyof typeof color.available],
+        }))
+        .filter(s => s.quantity > 0),
+    }))
+
+    setProductGrid({
+      id: productId,
+      name: productData.name,
+      price: productData.price,
+      colors: colorsWithQuantities,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quantities])
 
   const nextCarousel = () => {
     const maxIndex = Math.max(0, productData.moreProducts.length - 4)
@@ -161,39 +194,92 @@ export function ProductDetail({ productId }: ProductDetailProps) {
     <div className="w-full">
       <div className="flex flex-col lg:flex-row">
         {/* Left - Image Gallery */}
-        <div className="relative lg:w-[60%] flex">
-          <button
-            onClick={prevPair}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
-          >
-            <ChevronLeft size={28} className="text-gray-700" />
-          </button>
-
-          <div className="flex w-full">
-            {currentImages.map((_, index) => (
-              <div key={index} className="w-1/2 aspect-[3/4] bg-gray-100 relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-gray-200 to-gray-300" />
-              </div>
+        <div ref={galleryRef} className="lg:w-[60%] flex flex-col md:flex-row gap-2 md:gap-3 p-2 md:p-3 scroll-mt-20">
+          {/* Thumbnails - vertical (desktop) */}
+          <div className="hidden md:flex flex-col gap-2 w-16 lg:w-20 shrink-0 max-h-[80vh] overflow-y-auto py-0.5">
+            {productData.images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPair(index)}
+                aria-label={`Ver foto ${index + 1}`}
+                className={`relative w-full aspect-[2/3] rounded-md overflow-hidden border-2 transition-colors ${
+                  currentPair === index ? "border-gray-800" : "border-transparent hover:border-gray-400"
+                }`}
+              >
+                <span className="absolute inset-0" style={{ background: imageGradient(index) }} />
+              </button>
             ))}
-            {currentImages.length === 1 && (
-              <div className="w-1/2 aspect-[3/4] bg-gray-50" />
-            )}
           </div>
 
-          <button
-            onClick={nextPair}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
-          >
-            <ChevronRight size={28} className="text-gray-700" />
-          </button>
+          {/* Main image */}
+          <div className="relative flex-1">
+            <div className="w-full aspect-[2/3] bg-gray-100 relative overflow-hidden rounded-md">
+              <div className="absolute inset-0" style={{ background: imageGradient(currentPair) }} />
+            </div>
 
-          <div className="absolute top-4 right-4 flex gap-3 z-10">
-            <button className="p-2 hover:opacity-70 text-gray-500">
-              <Share2 size={20} />
+            <button
+              onClick={prevPair}
+              aria-label="Foto anterior"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
+            >
+              <ChevronLeft size={26} className="text-gray-700" />
             </button>
-            <button className="p-2 hover:opacity-70 text-gray-500">
-              <Heart size={20} />
+
+            <button
+              onClick={nextPair}
+              aria-label="Próxima foto"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-10 w-11 h-11 bg-white/60 rounded-full flex items-center justify-center hover:bg-white/80 transition-colors"
+            >
+              <ChevronRight size={26} className="text-gray-700" />
             </button>
+
+            {/* Cor ativa */}
+            <div className="absolute bottom-4 left-4 z-10 flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full">
+              <span
+                className="w-4 h-4 rounded-full border border-gray-300"
+                style={{ backgroundColor: activeColor.color }}
+              />
+              <span className="text-xs font-medium text-gray-800">{activeColor.name}</span>
+            </div>
+
+            {/* Indicadores de posição */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5">
+              {productData.images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPair(index)}
+                  aria-label={`Ver foto ${index + 1}`}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === currentPair ? "w-6 bg-gray-800" : "w-1.5 bg-white/70 hover:bg-white"
+                  }`}
+                />
+              ))}
+            </div>
+
+            <div className="absolute top-4 right-4 flex gap-3 z-10">
+              <button aria-label="Compartilhar" className="p-2 hover:opacity-70 text-gray-500">
+                <Share2 size={20} />
+              </button>
+              <button aria-label="Favoritar" className="p-2 hover:opacity-70 text-gray-500">
+                <Heart size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Thumbnails - horizontal (mobile) */}
+          <div className="flex md:hidden gap-2 overflow-x-auto pb-1">
+            {productData.images.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => setCurrentPair(index)}
+                aria-label={`Ver foto ${index + 1}`}
+                className={`relative shrink-0 w-14 aspect-[2/3] rounded-md overflow-hidden border-2 transition-colors ${
+                  currentPair === index ? "border-gray-800" : "border-transparent hover:border-gray-400"
+                }`}
+              >
+                <span className="absolute inset-0" style={{ background: imageGradient(index) }} />
+              </button>
+            ))}
           </div>
         </div>
 
@@ -351,83 +437,178 @@ export function ProductDetail({ productId }: ProductDetailProps) {
             </div>
           )}
 
-          {/* Size Grid - Only for logged in users */}
-          {isAuthenticated && (
-            <div className="mb-6">
-              <p className="text-xs text-gray-500 text-center mb-3 uppercase tracking-wide">
-                Deslize para ver todos os tamanhos →
-              </p>
-              
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px] border-collapse">
+          {/* Pedido Rápido (logado) / Cores e Tamanhos (visitante) */}
+          <div className="mb-6 border border-gray-200 rounded-lg p-4">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 tracking-wide">
+                    {isAuthenticated ? "PEDIDO RÁPIDO" : "CORES E TAMANHOS"}
+                  </h3>
+                  <p className="text-[11px] text-gray-500 uppercase tracking-wide mt-0.5">
+                    {isAuthenticated
+                      ? "Cada ajuste atualiza o carrinho automaticamente."
+                      : "Selecione a cor para ver as fotos."}
+                  </p>
+                </div>
+                {isAuthenticated && (
+                  <div className="flex items-center gap-1.5 text-gray-700 flex-shrink-0">
+                    <ShoppingCart size={16} />
+                    <span className="text-xs font-medium whitespace-nowrap">{totalItems} PC.</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Scroll hint */}
+              <button
+                type="button"
+                className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-2 text-[11px] text-gray-600 uppercase tracking-wide mb-3"
+              >
+                Para ver mais tamanhos arraste para o lado
+                <ArrowRight size={14} />
+              </button>
+
+              {/* Grid */}
+              <div className="overflow-x-auto border border-gray-200 rounded-md">
+                <table className="w-full min-w-[360px] border-collapse [&_tbody_tr:last-child_td]:border-b-0">
                   <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-left text-xs font-medium text-gray-500 uppercase py-3 px-2 w-32">Cor</th>
-                      {productData.sizes.map(size => (
-                        <th key={size} className="text-center text-xs font-medium text-gray-500 uppercase py-3 px-2">{size}</th>
-                      ))}
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 w-[76px]" />
+                      {productData.sizes.map(size => {
+                        const available = isSizeAvailable(size)
+                        return (
+                          <th
+                            key={size}
+                            className={`bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-sm font-normal py-3 ${
+                              available ? "text-gray-700" : "text-gray-400 line-through"
+                            }`}
+                          >
+                            {size.split(" ")[0]}
+                          </th>
+                        )
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {productData.colors.map((color) => (
-                      <tr key={color.name} className="border-b border-gray-100">
-                        <td className="py-3 px-2">
-                          <div className="flex items-center gap-2">
-                            <span 
-                              className="w-4 h-4 rounded-full border border-gray-200" 
-                              style={{ backgroundColor: color.color }}
-                            />
-                            <span className="text-xs text-gray-700 truncate max-w-[80px]">{color.name}</span>
-                          </div>
+                    {productData.colors.map((color) => {
+                      const colorAvailable = isColorAvailable(color)
+                      return (
+                      <tr key={color.name}>
+                        <td className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 px-1 py-3 align-middle w-[76px]">
+                          <button
+                            type="button"
+                            onClick={() => selectColor(color.name)}
+                            className="flex flex-col items-center gap-1.5 w-full group"
+                            aria-label={`Ver fotos da cor ${color.name}`}
+                            aria-pressed={selectedColor === color.name}
+                          >
+                            <span className="relative w-10 h-10">
+                              <span
+                                className={`block w-10 h-10 rounded-full border transition-all ${
+                                  selectedColor === color.name
+                                    ? "border-gray-800 ring-2 ring-gray-800 ring-offset-1"
+                                    : "border-gray-300 group-hover:border-gray-500"
+                                } ${colorAvailable ? "" : "opacity-40"}`}
+                                style={{ backgroundColor: color.color }}
+                              />
+                              {!colorAvailable && (
+                                <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-600 rounded-full" />
+                              )}
+                            </span>
+                            <span
+                              className={`block text-[10px] leading-tight text-center px-0.5 ${
+                                colorAvailable ? "text-gray-600" : "text-gray-400 line-through"
+                              }`}
+                            >
+                              {color.name}
+                            </span>
+                          </button>
                         </td>
                         {productData.sizes.map(size => {
                           const isAvailable = color.available[size as keyof typeof color.available]
                           const qty = getQuantity(color.name, size)
-                          
+
                           return (
-                            <td key={size} className="py-3 px-2 text-center">
+                            <td
+                              key={size}
+                              className="border-b border-r border-gray-200 last:border-r-0 text-center py-2"
+                            >
                               {isAvailable ? (
-                                <div className="flex items-center justify-center gap-1">
-                                  <button
-                                    onClick={() => updateQuantity(color.name, size, -1)}
-                                    className="w-7 h-7 border border-gray-300 rounded flex items-center justify-center hover:bg-gray-100 text-gray-500"
-                                  >
-                                    <Minus size={14} />
-                                  </button>
-                                  <span className="w-8 text-center text-sm">{qty}</span>
-                                  <button
-                                    onClick={() => updateQuantity(color.name, size, 1)}
-                                    className="w-7 h-7 border border-gray-300 rounded flex items-center justify-center hover:bg-gray-100 text-gray-500"
-                                  >
-                                    <Plus size={14} />
-                                  </button>
-                                </div>
+                                isAuthenticated ? (
+                                  <div className="flex flex-col items-center">
+                                    <button
+                                      onClick={() => updateQuantity(color.name, size, 1)}
+                                      className="text-gray-400 hover:text-gray-900 transition-colors"
+                                      aria-label={`Adicionar ${color.name} tamanho ${size}`}
+                                    >
+                                      <Plus size={14} />
+                                    </button>
+                                    <span
+                                      className={`text-base leading-tight ${
+                                        qty > 0 ? "font-semibold text-gray-900" : "font-medium text-gray-700"
+                                      }`}
+                                    >
+                                      {qty}
+                                    </span>
+                                    <button
+                                      onClick={() => updateQuantity(color.name, size, -1)}
+                                      className="text-gray-400 hover:text-gray-900 transition-colors disabled:opacity-30 disabled:hover:text-gray-400"
+                                      disabled={qty === 0}
+                                      aria-label={`Remover ${color.name} tamanho ${size}`}
+                                    >
+                                      <Minus size={14} />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span
+                                    className="inline-block w-2.5 h-2.5 rounded-full bg-gray-800"
+                                    aria-label="Disponível"
+                                    title="Disponível"
+                                  />
+                                )
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="relative inline-block w-4 h-4" aria-label="Esgotado" title="Esgotado">
+                                  <span className="block w-4 h-4 rounded-full bg-gray-200" />
+                                  <span className="absolute left-1/2 top-1/2 h-[1.5px] w-[130%] -translate-x-1/2 -translate-y-1/2 rotate-45 bg-gray-400 rounded-full" />
+                                </span>
                               )}
                             </td>
                           )
                         })}
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
-                <span className="font-medium">Legenda:</span>
-                <span className="flex items-center gap-1">
-                  <span className="w-3 h-3 bg-gray-100 border border-gray-300 rounded"></span>
-                  Disponível
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-gray-400">-</span>
-                  Esgotado
-                </span>
-              </div>
+              {isAuthenticated ? (
+                <>
+                  {/* Totals */}
+                  <div className="flex items-center justify-between mt-4">
+                    <span className="text-sm text-gray-600">{totalItems} PC.</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      R$ {subtotal.toFixed(2).replace(".", ",")}
+                    </span>
+                  </div>
+
+                  {/* Continue shopping */}
+                  <Link
+                    href="/catalogo"
+                    className="mt-3 w-full flex items-center justify-center border border-gray-800 rounded-md py-3 text-sm font-medium text-gray-900 hover:bg-gray-50 transition-colors"
+                  >
+                    Continuar Comprando
+                  </Link>
+                </>
+              ) : (
+                <p className="mt-4 text-center text-xs text-gray-500">
+                  <Link href="/login" className="text-gray-900 font-medium underline">
+                    Cadastre-se
+                  </Link>{" "}
+                  para ver preços e comprar no atacado.
+                </p>
+              )}
             </div>
-          )}
 
           {/* Shipping Calculator - Only for logged in users */}
           {isAuthenticated && (
@@ -599,29 +780,6 @@ export function ProductDetail({ productId }: ProductDetailProps) {
           </div>
         </div>
       </div>
-
-      {/* Fixed Cart Bar - Only when items selected */}
-      {isAuthenticated && totalItems > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-40">
-          <div className="px-4 md:px-8 lg:px-12 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">
-                <span className="font-medium text-gray-900">{totalItems}</span> peças selecionadas
-              </p>
-              <p className="text-lg font-semibold text-gray-900">
-                Subtotal: R$ {subtotal.toFixed(2).replace(".", ",")}
-              </p>
-            </div>
-            <button 
-              onClick={handleAddToCart}
-              className="flex items-center gap-2 px-8 py-3 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <ShoppingBag size={20} />
-              Adicionar ao Carrinho
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Measurements Modal */}
       {showMeasurements && (

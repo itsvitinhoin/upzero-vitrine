@@ -43,6 +43,7 @@ interface CartContextType {
   closeCart: () => void
   toggleCart: () => void
   addItem: (item: CartItem) => void
+  setProductGrid: (item: CartItem) => void
   updateItemQuantity: (productId: string, colorName: string, size: string, quantity: number) => void
   removeItem: (productId: string) => void
   clearCart: () => void
@@ -139,6 +140,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     openCart()
   }
 
+  // Substitui integralmente a entrada de um produto no carrinho (sincronização automática da grade).
+  // Remove o produto do carrinho caso não haja mais nenhuma peça selecionada.
+  const setProductGrid = (newItem: CartItem) => {
+    setItems(prev => {
+      const others = prev.filter(item => item.id !== newItem.id)
+      const cleanedColors = newItem.colors
+        .map(color => ({ ...color, sizes: color.sizes.filter(s => s.quantity > 0) }))
+        .filter(color => color.sizes.length > 0)
+
+      if (cleanedColors.length === 0) return others
+      return [...others, { ...newItem, colors: cleanedColors }]
+    })
+  }
+
   const updateItemQuantity = (productId: string, colorName: string, size: string, quantity: number) => {
     setItems(prev => {
       return prev.map(item => {
@@ -230,6 +245,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       closeCart,
       toggleCart,
       addItem,
+      setProductGrid,
       updateItemQuantity,
       removeItem,
       clearCart,

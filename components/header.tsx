@@ -314,6 +314,52 @@ export function Header() {
                 )}
               </div>
             ))}
+
+            {/* Área do perfil (mobile) */}
+            <div className="pt-4 mt-2 border-t border-gray-100">
+              {mounted && isAuthenticated ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-[#8B7355] rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-sm font-medium">
+                        {user?.name?.charAt(0) || "U"}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.document}</p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/carrinho"
+                    className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <ShoppingBag size={16} />
+                    Meu carrinho
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout()
+                      setMobileMenuOpen(false)
+                    }}
+                    className="flex items-center gap-2 text-sm text-gray-700 hover:text-gray-900"
+                  >
+                    <LogOut size={16} />
+                    Sair
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 text-sm font-medium text-gray-900"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User size={16} />
+                  Entrar / Cadastrar
+                </Link>
+              )}
+            </div>
           </nav>
         </div>
       )}
