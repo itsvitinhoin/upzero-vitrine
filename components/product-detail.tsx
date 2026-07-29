@@ -106,6 +106,39 @@ export function ProductDetail({ productId }: ProductDetailProps) {
   const imageGradient = (index: number) =>
     `linear-gradient(${135 + index * 35}deg, ${activeColor.color}33, ${activeColor.color}aa)`
 
+  // Detecta quais tamanhos estão fora da área visível (à direita) da tabela rolável
+  const gridScrollRef = useRef<HTMLDivElement>(null)
+  const [hiddenSizes, setHiddenSizes] = useState<string[]>([])
+
+  useEffect(() => {
+    const el = gridScrollRef.current
+    if (!el) return
+
+    const compute = () => {
+      const containerRight = el.getBoundingClientRect().right
+      const ths = el.querySelectorAll<HTMLElement>("th[data-size]")
+      const hidden: string[] = []
+      ths.forEach(th => {
+        if (th.getBoundingClientRect().right > containerRight + 2) {
+          hidden.push(th.dataset.size ?? "")
+        }
+      })
+      setHiddenSizes(hidden.filter(Boolean))
+    }
+
+    compute()
+    el.addEventListener("scroll", compute, { passive: true })
+    window.addEventListener("resize", compute)
+    return () => {
+      el.removeEventListener("scroll", compute)
+      window.removeEventListener("resize", compute)
+    }
+  }, [isAuthenticated])
+
+  const scrollGridRight = () => {
+    gridScrollRef.current?.scrollBy({ left: 200, behavior: "smooth" })
+  }
+
   const totalImages = productData.images.length
   const pixPrice = productData.price * (1 - productData.pixDiscount)
   const installmentValue = productData.price / productData.installments
@@ -460,30 +493,38 @@ export function ProductDetail({ productId }: ProductDetailProps) {
               </div>
 
               {/* Scroll hint */}
-              <button
-                type="button"
-                className="flex items-center gap-2 border border-gray-300 rounded-md px-3 py-2 text-[11px] text-gray-600 uppercase tracking-wide mb-3"
-              >
-                Para ver mais tamanhos arraste para o lado
-                <ArrowRight size={14} />
-              </button>
+              {hiddenSizes.length > 0 && (
+                <button
+                  type="button"
+                  onClick={scrollGridRight}
+                  className="flex items-center gap-2 w-full text-left border border-[#8B7355]/40 bg-[#F5F1EC] rounded-md px-3 py-2 text-[11px] text-[#6b5642] mb-3 animate-pulse"
+                >
+                  <ArrowRight size={14} className="flex-shrink-0" />
+                  <span className="uppercase tracking-wide">
+                    Arraste para ver mais tamanhos:{" "}
+                    <span className="font-bold">{hiddenSizes.join(", ")}</span>
+                  </span>
+                </button>
+              )}
 
               {/* Grid */}
-              <div className="overflow-x-auto border border-gray-200 rounded-md">
+              <div ref={gridScrollRef} className="overflow-x-auto border border-gray-200 rounded-md">
                 <table className="w-full min-w-[360px] border-collapse [&_tbody_tr:last-child_td]:border-b-0">
                   <thead>
                     <tr>
                       <th className="sticky left-0 z-10 bg-gray-50 border-b border-r border-gray-200 w-[76px]" />
                       {productData.sizes.map(size => {
                         const available = isSizeAvailable(size)
+                        const label = size.split(" ")[0]
                         return (
                           <th
                             key={size}
+                            data-size={label}
                             className={`bg-gray-50 border-b border-r border-gray-200 last:border-r-0 text-center text-sm font-normal py-3 ${
                               available ? "text-gray-700" : "text-gray-400 line-through"
                             }`}
                           >
-                            {size.split(" ")[0]}
+                            {label}
                           </th>
                         )
                       })}
